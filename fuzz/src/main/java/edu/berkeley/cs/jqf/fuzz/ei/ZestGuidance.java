@@ -152,6 +152,9 @@ public class ZestGuidance implements Guidance {
     /** The maximum number of keys covered by any single input found so far. */
     protected int maxCoverage = 0;
 
+    /** The set of unique coverages' hashcodes found so far. */
+    protected Set<List<Coverage.Branch>> uniqueBranchCoverage = new HashSet<>();
+
     /** A mapping of coverage keys to inputs that are responsible for them. */
     protected Map<Object, Input> responsibleInputs = new HashMap<>(totalCoverage.size());
 
@@ -183,6 +186,9 @@ public class ZestGuidance implements Guidance {
 
     /** The file where log data is written. */
     protected File logFile;
+
+    /** The file where coverage log data is written. */
+    protected File coverageLogFile;
 
     /** The file where saved plot data is written. */
     protected File statsFile;
@@ -337,6 +343,7 @@ public class ZestGuidance implements Guidance {
         }
         this.statsFile = new File(outputDirectory, "plot_data");
         this.logFile = new File(outputDirectory, "fuzz.log");
+        this.coverageLogFile = new File(outputDirectory, "coverage.log");
         this.currentInputFile = new File(outputDirectory, ".cur_input");
 
 
@@ -346,6 +353,7 @@ public class ZestGuidance implements Guidance {
         // We also do not check if the deletes are actually successful.
         statsFile.delete();
         logFile.delete();
+        coverageLogFile.delete();
         for (File file : savedCorpusDirectory.listFiles()) {
             file.delete();
         }
@@ -376,6 +384,18 @@ public class ZestGuidance implements Guidance {
             if (logFile != null) {
                 appendLineToFile(logFile, line);
 
+            } else {
+                System.err.println(line);
+            }
+        }
+    }
+
+    /** Writes a line of text to the coverage log file. */
+    protected void coverageLog(String str, Object... args) {
+        if (verbose) {
+            String line = String.format(str, args);
+            if (coverageLogFile != null) {
+                appendLineToFile(coverageLogFile, line);
             } else {
                 System.err.println(line);
             }
@@ -669,7 +689,6 @@ public class ZestGuidance implements Guidance {
             boolean toSave = false;
             String why = "";
 
-
             if (SAVE_NEW_COUNTS && coverageBitsUpdated) {
                 toSave = true;
                 why = why + "+count";
@@ -690,6 +709,11 @@ public class ZestGuidance implements Guidance {
                 currentInput.valid = true;
                 toSave = true;
                 why = why + "+valid";
+            }
+
+            if (uniqueBranchCoverage.add(runCoverage.getCoveredBranches())) {
+                toSave = true;
+                why = why + "+uniqecov";
             }
 
             if (toSave) {
@@ -842,7 +866,9 @@ public class ZestGuidance implements Guidance {
                 out.write(b);
             }
         }
-
+        if (saveFile != currentInputFile) {
+            coverageLog(saveFile.getAbsolutePath() + "\t" + runCoverage.getCoveredBranches());
+        }
     }
 
     /* Saves an interesting input to the queue. */
@@ -889,7 +915,6 @@ public class ZestGuidance implements Guidance {
             // We are now responsible
             responsibleInputs.put(b, currentInput);
         }
-
     }
 
 

@@ -28,9 +28,12 @@
  */
 package edu.berkeley.cs.jqf.fuzz.util;
 
+import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Set;
+import java.util.HashSet;
 
 import edu.berkeley.cs.jqf.instrument.tracing.events.BranchEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.CallEvent;
@@ -50,9 +53,12 @@ public class Coverage implements TraceEventVisitor {
     /** The coverage counts for each edge. */
     private final Counter counter = new NonZeroCachingCounter(COVERAGE_MAP_SIZE);
 
+    /** The covered branch ids */
+    private Set<Branch> coveredBranches;
+
     /** Creates a new coverage map. */
     public Coverage() {
-
+        coveredBranches = new HashSet<Branch>();
     }
 
     /**
@@ -64,6 +70,37 @@ public class Coverage implements TraceEventVisitor {
         for (int idx = 0; idx < COVERAGE_MAP_SIZE; idx++) {
             this.counter.setAtIndex(idx, that.counter.getAtIndex(idx));
         }
+        coveredBranches = new HashSet<Branch>(that.coveredBranches);
+    }
+
+    public static class Branch implements Comparable<Branch> {
+        public final int bid;
+        public final int arm;
+
+        public Branch(int bid, int arm) {
+            this.bid = bid;
+            this.arm = arm;
+        }
+
+        public String toString() {
+            return Integer.toString(bid) + '-' + Integer.toString(arm);
+        }
+
+        @Override
+        public int compareTo(Branch b) {
+            return Integer.compare(this.hashCode(), b.hashCode());
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            Branch b = (Branch) o;
+            return this.bid == b.bid && this.arm == b.arm;
+        }
+
+        @Override
+        public int hashCode() {
+            return this.bid*10 + this.arm;
+        }
     }
 
     /**
@@ -73,6 +110,19 @@ public class Coverage implements TraceEventVisitor {
      */
     public int size() {
         return COVERAGE_MAP_SIZE;
+    }
+
+    /**
+     * Convert NonZeroIndices to string
+     *
+     * @return the non-zero indices joined by ','
+     */
+    public String toString() {
+        ArrayList nonZeros = new ArrayList<>();
+        for (int idx : this.counter.getNonZeroIndices()) {
+            nonZeros.add(Integer.toString(idx));
+        }
+        return String.join(",", nonZeros);//str;
     }
 
     /**
@@ -90,6 +140,7 @@ public class Coverage implements TraceEventVisitor {
     @Override
     public void visitBranchEvent(BranchEvent b) {
         counter.increment1(b.getIid(), b.getArm());
+        coveredBranches.add(new Branch(b.getIid(), b.getArm()));
     }
 
     @Override
@@ -113,6 +164,17 @@ public class Coverage implements TraceEventVisitor {
      */
     public Collection<?> getCovered() {
         return counter.getNonZeroIndices();
+    }
+
+    /**
+     * Returns a list of branches that are covered.
+     *
+     * @return a list of branches (bid, arm) that are covered
+     */
+    public List<Branch> getCoveredBranches() {
+        List<Coverage.Branch> branchList = new ArrayList(coveredBranches);
+        branchList.sort(null);
+        return branchList;
     }
 
     /** Returns a set of edges in this coverage that don't exist in baseline */
