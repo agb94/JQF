@@ -54,11 +54,11 @@ public class Coverage implements TraceEventVisitor {
     private final Counter counter = new NonZeroCachingCounter(COVERAGE_MAP_SIZE);
 
     /** The covered branch ids */
-    private Set<Branch> coveredBranches;
+    private Set<String> coveredBranches;
 
     /** Creates a new coverage map. */
     public Coverage() {
-        coveredBranches = new HashSet<Branch>();
+        coveredBranches = new HashSet<String>();
     }
 
     /**
@@ -70,7 +70,7 @@ public class Coverage implements TraceEventVisitor {
         for (int idx = 0; idx < COVERAGE_MAP_SIZE; idx++) {
             this.counter.setAtIndex(idx, that.counter.getAtIndex(idx));
         }
-        coveredBranches = new HashSet<Branch>(that.coveredBranches);
+        coveredBranches = new HashSet<String>(that.coveredBranches);
     }
 
     public static class Branch implements Comparable<Branch> {
@@ -140,7 +140,7 @@ public class Coverage implements TraceEventVisitor {
     @Override
     public void visitBranchEvent(BranchEvent b) {
         counter.increment1(b.getIid(), b.getArm());
-        coveredBranches.add(new Branch(b.getIid(), b.getArm()));
+        coveredBranches.add(b.toString());
     }
 
     @Override
@@ -171,8 +171,8 @@ public class Coverage implements TraceEventVisitor {
      *
      * @return a list of branches (bid, arm) that are covered
      */
-    public List<Branch> getCoveredBranches() {
-        List<Coverage.Branch> branchList = new ArrayList(coveredBranches);
+    public List<String> getCoveredBranches() {
+        List<String> branchList = new ArrayList(coveredBranches);
         branchList.sort(null);
         return branchList;
     }

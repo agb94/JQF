@@ -152,8 +152,8 @@ public class ZestGuidance implements Guidance {
     /** The maximum number of keys covered by any single input found so far. */
     protected int maxCoverage = 0;
 
-    /** The set of unique coverages' hashcodes found so far. */
-    protected Set<List<Coverage.Branch>> uniqueBranchCoverage = new HashSet<>();
+    /** The set of unique branch coverage patterns found so far. */
+    protected Set<List<String>> uniqueBranchCoverage = new HashSet<>();
 
     /** A mapping of coverage keys to inputs that are responsible for them. */
     protected Map<Object, Input> responsibleInputs = new HashMap<>(totalCoverage.size());
@@ -713,7 +713,7 @@ public class ZestGuidance implements Guidance {
 
             if (uniqueBranchCoverage.add(runCoverage.getCoveredBranches())) {
                 toSave = true;
-                why = why + "+uniqecov";
+                why = why + "+uniquecov";
             }
 
             if (toSave) {
