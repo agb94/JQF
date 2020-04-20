@@ -33,7 +33,7 @@ import janala.logger.inst.MemberRef;
 /**
  * @author Rohan Padhye
  */
-public class BranchEvent extends TraceEvent {
+public class BranchEvent extends TraceEvent implements Comparable<BranchEvent> {
     /**
      * The branch arm that is taken.
      *
@@ -55,13 +55,33 @@ public class BranchEvent extends TraceEvent {
 
     @Override
     public String toString() {
+        return String.format("BRANCH(%d,%d)", iid, arm);
+    }
+
+    public String toStringWithLocation() {
         return String.format("BRANCH(%d,%d,%s,%s,%s,%d)", iid, arm,
-                             this.getContainingClass(), this.getContainingMethodName(),
-                             this.getContainingMethodDesc(), lineNumber);
+                             getContainingClass(), getContainingMethodName(),
+                             getContainingMethodDesc(), getLineNumber());
     }
 
     @Override
     public void applyVisitor(TraceEventVisitor v) {
         v.visitBranchEvent(this);
+    }
+
+    @Override
+    public int compareTo(BranchEvent b) {
+        return Integer.compare(this.hashCode(), b.hashCode());
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        BranchEvent b = (BranchEvent) o;
+        return this.getIid() == b.getIid() && this.getArm() == b.getArm();
+    }
+
+    @Override
+    public int hashCode() {
+        return this.iid * 1000 + this.arm;
     }
 }

@@ -61,6 +61,7 @@ import edu.berkeley.cs.jqf.fuzz.guidance.Result;
 import edu.berkeley.cs.jqf.fuzz.guidance.TimeoutException;
 import edu.berkeley.cs.jqf.fuzz.util.Coverage;
 import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent;
+import edu.berkeley.cs.jqf.instrument.tracing.events.BranchEvent;
 
 import static java.lang.Math.ceil;
 import static java.lang.Math.log;
@@ -153,7 +154,7 @@ public class ZestGuidance implements Guidance {
     protected int maxCoverage = 0;
 
     /** The set of unique branch coverage patterns found so far. */
-    protected Set<List<String>> uniqueBranchCoverage = new HashSet<>();
+    protected Set<List<BranchEvent>> uniqueBranchCoverage = new HashSet<>();
 
     /** A mapping of coverage keys to inputs that are responsible for them. */
     protected Map<Object, Input> responsibleInputs = new HashMap<>(totalCoverage.size());
@@ -190,6 +191,9 @@ public class ZestGuidance implements Guidance {
     /** The file where coverage log data is written. */
     protected File coverageLogFile;
 
+    /** The file where input args log data is written. */
+    protected File argsLogFile;
+
     /** The file where saved plot data is written. */
     protected File statsFile;
 
@@ -201,6 +205,12 @@ public class ZestGuidance implements Guidance {
 
     /** Whether to hide fuzzing statistics **/
     static final boolean QUIET_MODE = Boolean.getBoolean("jqf.ei.QUIET_MODE");
+
+    /** Whether to log evaluate input to argsLogFile */
+    protected boolean printArgs = true;
+
+    /** Current Args */
+    protected String currentInputAsString;
 
     // ------------- TIMEOUT HANDLING ------------
 
@@ -344,6 +354,7 @@ public class ZestGuidance implements Guidance {
         this.statsFile = new File(outputDirectory, "plot_data");
         this.logFile = new File(outputDirectory, "fuzz.log");
         this.coverageLogFile = new File(outputDirectory, "coverage.log");
+        this.argsLogFile = new File(outputDirectory, "args.log");
         this.currentInputFile = new File(outputDirectory, ".cur_input");
 
 
@@ -354,6 +365,7 @@ public class ZestGuidance implements Guidance {
         statsFile.delete();
         logFile.delete();
         coverageLogFile.delete();
+        argsLogFile.delete();
         for (File file : savedCorpusDirectory.listFiles()) {
             file.delete();
         }
@@ -377,12 +389,11 @@ public class ZestGuidance implements Guidance {
 
     }
 
-    /** Writes a line of text to the log file. */
-    protected void infoLog(String str, Object... args) {
+    protected void logging(File file, String str, Object... args) {
         if (verbose) {
             String line = String.format(str, args);
-            if (logFile != null) {
-                appendLineToFile(logFile, line);
+            if (file != null) {
+                appendLineToFile(file, line);
 
             } else {
                 System.err.println(line);
@@ -390,16 +401,19 @@ public class ZestGuidance implements Guidance {
         }
     }
 
+    /** Writes a line of text to the log file. */
+    protected void infoLog(String str, Object... args) {
+        logging(logFile, str, args);
+    }
+
     /** Writes a line of text to the coverage log file. */
     protected void coverageLog(String str, Object... args) {
-        if (verbose) {
-            String line = String.format(str, args);
-            if (coverageLogFile != null) {
-                appendLineToFile(coverageLogFile, line);
-            } else {
-                System.err.println(line);
-            }
-        }
+        logging(coverageLogFile, str, args);
+    }
+
+    /** Writes a line of text to the args log file. */
+    protected void argsLog(String str, Object... args) {
+        logging(argsLogFile, str, args);
     }
 
     private String millisToDuration(long millis) {
@@ -646,6 +660,14 @@ public class ZestGuidance implements Guidance {
     }
 
     @Override
+    public void observeGeneratedArgs(Object[] args) {
+        currentInputAsString = "";
+        for (int i = 0; i < args.length; i++) {
+            currentInputAsString += String.format("[%d]: %s\n", i, String.valueOf(args[i]));
+        }
+    }
+
+    @Override
     public void handleResult(Result result, Throwable error) throws GuidanceException {
         // Stop timeout handling
         this.runStart = null;
@@ -866,8 +888,17 @@ public class ZestGuidance implements Guidance {
                 out.write(b);
             }
         }
+
         if (saveFile != currentInputFile) {
-            coverageLog(saveFile.getAbsolutePath() + "\t" + runCoverage.getCoveredBranches());
+            ArrayList branchLocations = new ArrayList<String>();
+            for (BranchEvent b: runCoverage.getCoveredBranches()) {
+                branchLocations.add(b.toStringWithLocation());
+            }
+            coverageLog(saveFile.getAbsolutePath() + "\t" + String.join("|", branchLocations));
+            if (printArgs) {
+                argsLog(saveFile.getAbsolutePath());
+                argsLog(currentInputAsString);
+            }
         }
     }
 
