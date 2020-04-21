@@ -894,9 +894,9 @@ public class ZestGuidance implements Guidance {
             for (BranchEvent b: runCoverage.getCoveredBranches()) {
                 branchLocations.add(b.toStringWithLocation());
             }
-            coverageLog(saveFile.getAbsolutePath() + "\t" + String.join("|", branchLocations));
+            coverageLog(saveFile.getPath() + "\t" + String.join("|", branchLocations));
             if (printArgs) {
-                argsLog(saveFile.getAbsolutePath());
+                argsLog("Input - " + saveFile.getPath());
                 argsLog(currentInputAsString);
             }
         }
