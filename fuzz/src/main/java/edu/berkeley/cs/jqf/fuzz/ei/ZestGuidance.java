@@ -84,6 +84,8 @@ public class ZestGuidance implements Guidance {
     /** The name of the test for display purposes. */
     protected final String testName;
 
+    protected final String checkSignature = "[check]";
+
     // ------------ ALGORITHM BOOKKEEPING ------------
 
     /** The max amount of time to run for, in milli-seconds */
@@ -160,7 +162,7 @@ public class ZestGuidance implements Guidance {
     protected Map<Object, Input> responsibleInputs = new HashMap<>(totalCoverage.size());
 
     /** The set of unique failures found so far. */
-    protected Set<List<StackTraceElement>> uniqueFailures = new HashSet<>();
+    protected Set<List<String>> uniqueFailures = new HashSet<>();
 
     /** save crash to specific location (should be used with EXIT_ON_CRASH) **/
     static final String EXACT_CRASH_PATH = System.getProperty("jqf.ei.EXACT_CRASH_PATH");
@@ -210,7 +212,7 @@ public class ZestGuidance implements Guidance {
     protected boolean printArgs = true;
 
     /** Current Args */
-    protected String currentInputAsString;
+    protected List<String> currentInputAsString;
 
     // ------------- TIMEOUT HANDLING ------------
 
@@ -661,28 +663,34 @@ public class ZestGuidance implements Guidance {
 
     @Override
     public void observeGeneratedArgs(Object[] args) {
-        currentInputAsString = "";
+        currentInputAsString = new ArrayList<String>();
         for (int i = 0; i < args.length; i++) {
-            currentInputAsString += String.format("[%d]: %s\n", i, String.valueOf(args[i]));
+            currentInputAsString.add(String.valueOf(args[i]));
         }
     }
 
     @Override
     public void handleResult(Result result, Throwable error) throws GuidanceException {
+        String msg = "";
+        if (error != null) {
+          msg = error.getMessage() != null ? error.getMessage() : "";
+        }
+
         // Stop timeout handling
         this.runStart = null;
 
         // Increment run count
         this.numTrials++;
 
-        boolean valid = result == Result.SUCCESS;
-
-        if (valid) {
-            // Increment valid counter
-            numValid++;
-        }
-
         if (result == Result.SUCCESS || result == Result.INVALID) {
+            boolean valid = result == Result.SUCCESS;
+            boolean check = result == Result.INVALID && msg.contains(checkSignature);
+            valid |= check;
+
+            if (valid) {
+                // Increment valid counter
+                numValid++;
+            }
 
             // Coverage before
             int nonZeroBefore = totalCoverage.getNonZeroCount();
@@ -733,9 +741,9 @@ public class ZestGuidance implements Guidance {
                 why = why + "+valid";
             }
 
-            if (uniqueBranchCoverage.add(runCoverage.getCoveredBranches())) {
+            if (check && uniqueBranchCoverage.add(runCoverage.getCoveredBranches())) {
                 toSave = true;
-                why = why + "+uniquecov";
+                why = why = "+uniquecov+check";
             }
 
             if (toSave) {
@@ -763,11 +771,10 @@ public class ZestGuidance implements Guidance {
                 // Save input to queue and to disk
                 final String reason = why;
                 GuidanceException.wrap(() -> saveCurrentInput(responsibilities, reason));
+                infoLog("<msg>\n%s\n</msg>", msg != null ? msg : "");
 
             }
         } else if (result == Result.FAILURE || result == Result.TIMEOUT) {
-            String msg = error.getMessage();
-
             // Get the root cause of the failure
             Throwable rootCause = error;
             while (rootCause.getCause() != null) {
@@ -775,7 +782,7 @@ public class ZestGuidance implements Guidance {
             }
 
             // Attempt to add this to the set of unique failures
-            if (uniqueFailures.add(Arrays.asList(rootCause.getStackTrace()))) {
+            if (uniqueFailures.add(currentInputAsString)) {
 
                 // Trim input (remove unused keys)
                 currentInput.gc();
@@ -788,11 +795,11 @@ public class ZestGuidance implements Guidance {
                     String saveFileName = String.format("id_%06d", crashIdx);
                     File saveFile = new File(savedFailuresDirectory, saveFileName);
                     GuidanceException.wrap(() -> writeCurrentInputToFile(saveFile));
-                    infoLog("%s","Found crash: " + error.getClass() + " - " + (msg != null ? msg : ""));
                     String how = currentInput.desc;
                     String why = result == Result.FAILURE ? "+crash" : "+hang";
                     infoLog("Saved - %s %s %s", saveFile.getPath(), how, why);
-
+                    infoLog("Error class - %s", error.getClass());
+                    infoLog("<msg>\n%s\n</msg>", msg);
                     if (EXACT_CRASH_PATH != null && !EXACT_CRASH_PATH.equals("")) {
                         File exactCrashFile = new File(EXACT_CRASH_PATH);
                         GuidanceException.wrap(() -> writeCurrentInputToFile(exactCrashFile));
@@ -897,7 +904,7 @@ public class ZestGuidance implements Guidance {
             coverageLog(saveFile.getPath() + "\t" + String.join("|", branchLocations));
             if (printArgs) {
                 argsLog("Input - " + saveFile.getPath());
-                argsLog(currentInputAsString);
+                argsLog(String.join("\n", currentInputAsString));
             }
         }
     }
