@@ -743,7 +743,7 @@ public class ZestGuidance implements Guidance {
 
             if (check && uniqueBranchCoverage.add(runCoverage.getCoveredBranches())) {
                 toSave = true;
-                why = why = "+uniquecov+check";
+                why = why + "+uniquecov+check";
             }
 
             if (toSave) {
