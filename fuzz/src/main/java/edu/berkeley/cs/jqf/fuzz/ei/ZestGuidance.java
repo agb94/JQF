@@ -162,7 +162,8 @@ public class ZestGuidance implements Guidance {
     protected Map<Object, Input> responsibleInputs = new HashMap<>(totalCoverage.size());
 
     /** The set of unique failures found so far. */
-    protected Set<List<String>> uniqueFailures = new HashSet<>();
+    protected Set<List<StackTraceElement>> uniqueFailures = new HashSet<>();
+    //protected Set<List<String>> uniqueFailures = new HashSet<>();
 
     /** save crash to specific location (should be used with EXIT_ON_CRASH) **/
     static final String EXACT_CRASH_PATH = System.getProperty("jqf.ei.EXACT_CRASH_PATH");
@@ -782,7 +783,7 @@ public class ZestGuidance implements Guidance {
             }
 
             // Attempt to add this to the set of unique failures
-            if (uniqueFailures.add(currentInputAsString)) {
+            if (uniqueFailures.add(Arrays.asList(rootCause.getStackTrace()))) {
 
                 // Trim input (remove unused keys)
                 currentInput.gc();
